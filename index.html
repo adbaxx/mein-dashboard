@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101522">
+<link rel="manifest" href="manifest.json">
+<title>Mein Dashboard</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#eef2f7;background:#0d1119}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0d1119,#151c2b);min-height:100vh}
+main{max-width:760px;margin:auto;padding:18px 14px 32px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+h1{font-size:25px;margin:0}.sub{color:#9aa6b7;font-size:13px}.btn{border:1px solid #344052;background:#1b2433;color:#fff;border-radius:12px;padding:10px 12px}
+section{margin-top:18px}.title{font-size:14px;font-weight:700;margin:0 0 9px 3px;color:#cdd5e1}
+.grid3,.grid2{display:grid;gap:10px}.grid3{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:repeat(2,1fr)}
+.card{background:#171e2b;border:1px solid #2b3545;border-radius:18px;padding:15px;box-shadow:0 8px 24px #0003}
+.label{color:#9aa6b7;font-size:12px}.value{font-size:28px;font-weight:800;margin:5px 0}.small{font-size:12px;color:#9aa6b7;margin-top:4px}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}.green{color:#63d391}.red{color:#ff7777}
+.match{padding:12px 0;border-top:1px solid #2b3545}.match:first-child{border-top:0}.center{text-align:center}
+#status{text-align:center;color:#788598;font-size:11px;margin-top:16px}
+@media(max-width:560px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<main>
+<div class="top"><div><h1>Mein Dashboard</h1><div class="sub">Wetter · Märkte · Fußball</div></div><button class="btn" id="refresh">↻</button></div>
+<section><div class="title">🌤 Wetter & Regen</div><div id="weather" class="grid3"><div class="card">Lade …</div></div></section>
+<section><div class="title">💱 Währung</div><div class="card"><div class="label">EUR → TRY</div><div id="fx" class="value">Lade …</div><div class="small">Euro / Türkische Lira</div></div></section>
+<section><div class="title">📈 Börsenindizes</div><div class="grid2">
+<div class="card"><div class="row"><b>DAX</b><span>🇩🇪</span></div><div id="dax" class="value">—</div></div>
+<div class="card"><div class="row"><b>BIST 100</b><span>🇹🇷</span></div><div id="bist" class="value">—</div></div>
+<div class="card"><div class="row"><b>Dow Jones</b><span>🇺🇸</span></div><div id="dow" class="value">—</div></div>
+<div class="card"><div class="row"><b>S&amp;P 500</b><span>🇺🇸</span></div><div id="sp" class="value">—</div></div>
+<div class="card"><div class="row"><b>Nasdaq</b><span>🇺🇸</span></div><div id="nasdaq" class="value">—</div></div>
+</div></section>
+<section><div class="title">🪙 Edelmetalle</div><div class="grid2">
+<div class="card"><div class="label">🥇 Gold</div><div id="gold" class="value">—</div><div class="small">USD / Feinunze</div></div>
+<div class="card"><div class="label">🥈 Silber</div><div id="silver" class="value">—</div><div class="small">USD / Feinunze</div></div>
+</div></section>
+<section><div class="title">⚽ Nächste Länderspiele</div><div class="card" id="football">Lade …</div></section>
+<div id="status">Wird aktualisiert …</div>
+</main>
+<script>
+const places=[["Akyaka",37.056,28.326],["Çamlı",36.985,28.274],["Alanya",36.543,31.999]];
+const n=x=>Number.isFinite(+x)?(+x).toLocaleString("de-DE",{maximumFractionDigits:2}):"—";
+async function weather(){
+ const out=await Promise.all(places.map(async p=>{
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${p[1]}&longitude=${p[2]}&current=temperature_2m,apparent_temperature,wind_speed_10m&hourly=precipitation_probability,precipitation&forecast_days=2&timezone=auto`;
+  return [p[0],await (await fetch(u)).json()];
+ }));
+ document.querySelector("#weather").innerHTML=out.map(([name,d])=>{
+  let i=-1; for(let k=1;k<d.hourly.precipitation_probability.length;k++){if(d.hourly.precipitation_probability[k]>=40){i=k;break}}
+  let rain=i<0?"🌤 Kein Regen erwartet":`🌧 Regen ab ${new Date(d.hourly.time[i]).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} · ${d.hourly.precipitation_probability[i]}%`;
+  return `<div class="card"><div class="label">${name}</div><div class="value">${n(d.current.temperature_2m)}°</div><div>🌡 Gefühlt ${n(d.current.apparent_temperature)}°</div><div class="small">${rain}</div><div class="small">Wind ${n(d.current.wind_speed_10m)} km/h</div></div>`;
+ }).join("");
+}
+async function finance(){
+ try{let x=await (await fetch("https://api.frankfurter.app/latest?from=EUR&to=TRY")).json();document.querySelector("#fx").textContent=n(x.rates.TRY)+" ₺"}catch{}
+}
+async function football(){
+ try{
+  let d=await (await fetch("https://www.thesportsdb.com/api/v1/json/3/eventsnext.php?id=471")).json();
+  let games=(d.events||[]).filter(x=>/Germany|Turkey|Türkiye/i.test((x.strHomeTeam||"")+" "+(x.strAwayTeam||"")));
+  document.querySelector("#football").innerHTML=games.length?games.slice(0,8).map(x=>`<div class="match"><div class="row"><b>${x.strHomeTeam}</b><span>⚽</span><b>${x.strAwayTeam}</b></div><div class="small center">${x.dateEvent||""} ${x.strTime||""}</div></div>`).join(""):"<div class='small'>Keine passenden kommenden Spiele gefunden.</div>";
+ }catch{document.querySelector("#football").innerHTML="<div class='small'>Fußball-Daten momentan nicht verfügbar.</div>"}
+}
+async function load(){
+ document.querySelector("#status").textContent="Aktualisiere …";
+ await Promise.all([weather(),finance(),football()]);
+ document.querySelector("#status").textContent="Zuletzt aktualisiert: "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+}
+document.querySelector("#refresh").onclick=load;load();setInterval(load,15*60*1000);
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body></html>
