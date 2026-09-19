@@ -1,6 +1,6 @@
- <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101522"><link rel="manifest" href="manifest.json"><title>Mein Dashboard</title>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101522"><link rel="manifest" href="manifest.json"><title>Mein Dashboard</title>
 <style>
-:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#eef2f7;background:#0d1119}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0d1119,#151c2b);min-height:100vh}main{max-width:760px;margin:auto;padding:18px 14px 32px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h1{font-size:25px;margin:0}.sub,.small,.status{color:#9aa6b7;font-size:12px}.btn{border:1px solid #344052;background:#1b2433;color:#fff;border-radius:12px;padding:10px 12px}.title{font-size:14px;font-weight:700;margin:18px 0 9px 3px}.grid3,.grid2{display:grid;gap:10px}.grid3{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:repeat(2,1fr)}.card{background:#171e2b;border:1px solid #2b3545;border-radius:18px;padding:15px;box-shadow:0 8px 24px #0003}.label{color:#9aa6b7;font-size:12px}.value{font-size:28px;font-weight:800;margin:5px 0}.row{display:flex;justify-content:space-between;gap:8px;align-items:center}.match{padding:12px 0;border-top:1px solid #2b3545}.match:first-child{border-top:0}.center{text-align:center}.green{color:#63d391}.red{color:#ff7777}.water{font-size:24px;font-weight:800}@media(max-width:560px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr 1fr}}
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#eef2f7;background:#0d1119}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0d1119,#151c2b);min-height:100vh}main{max-width:760px;margin:auto;padding:18px 14px 32px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h1{font-size:25px;margin:0}.sub,.small,.status{color:#9aa6b7;font-size:12px}.btn{border:1px solid #344052;background:#1b2433;color:#fff;border-radius:12px;padding:10px 12px}.title{font-size:14px;font-weight:700;margin:18px 0 9px 3px}.grid3,.grid2{display:grid;gap:10px}.grid3{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:repeat(2,1fr)}.card{background:#171e2b;border:1px solid #2b3545;border-radius:18px;padding:15px;box-shadow:0 8px 24px #0003}.label{color:#9aa6b7;font-size:12px}.value{font-size:28px;font-weight:800;margin:5px 0}.row{display:flex;justify-content:space-between;gap:8px;align-items:center}.match{padding:12px 0;border-top:1px solid #2b3545}.match:first-child{border-top:0}.center{text-align:center}.green{color:#63d391}.red{color:#ff7777}.quote{display:flex;align-items:center;gap:8px}.arrow{font-size:22px;font-weight:900}.arrow.up{color:#63d391}.arrow.down{color:#ff7777}.arrow.flat{color:#9aa6b7}.water{font-size:24px;font-weight:800}@media(max-width:560px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr 1fr}}
 </style></head><body><main>
 <div class="top"><div><h1>Mein Dashboard</h1><div class="sub">Wetter · Wasser · Märkte · Fußball</div></div><button class="btn" id="refresh">↻ Aktualisieren</button></div>
 
@@ -45,21 +45,53 @@ async function water(){
  document.querySelector("#water").innerHTML=data.map(([name,d])=>`<div class="card"><div class="label">${name}</div><div class="water">${fmt(d.hourly.sea_surface_temperature[0])} °C</div><div class="small">Meerestemperatur · aktuelle Modellprognose</div></div>`).join("");
 }
 
-async function fx(){let d=await j("https://api.frankfurter.dev/v2/rate/eur/try");document.querySelector("#fx").textContent=fmt(d.rate)+" ₺"}
-
-async function metals(){try{let d=await j("https://biquote.io/api/latest?symbols=XAUUSD&symbols=XAGUSD");document.querySelector("#gold").textContent="$"+fmt(d.XAUUSD?.mid);document.querySelector("#silver").textContent="$"+fmt(d.XAGUSD?.mid)}catch{}}
-
-async function marketSearch(q){
- try{let a=await j("https://biquote.io/api/symbols/search?q="+encodeURIComponent(q)+"&limit=25");return Array.isArray(a)?a:[]}
- catch{return []}
+async function quote(symbol){
+  const d=await j("https://biquote.io/api/"+encodeURIComponent(symbol));
+  return d;
 }
-async function stock(id,q){
- let a=await marketSearch(q);
- let x=a.find(s=>/index/i.test(s.type||""))||a[0];
- if(!x)return;
- try{let t=await j("https://biquote.io/api/"+encodeURIComponent(x.name));let p=t.mid??t.last;if(Number.isFinite(+p)){document.querySelector("#"+id).textContent=fmt(p);let e=document.querySelector("#"+id+"c");if(Number.isFinite(+t.dayDiffPercent)){e.textContent=(t.dayDiffPercent>=0?"▲ ":"▼ ")+fmt(Math.abs(t.dayDiffPercent))+"%";e.className="small "+(t.dayDiffPercent>=0?"green":"red")}else e.textContent=t.marketState==="closed"?"Markt geschlossen · letzter Kurs":""}}catch{}
+function showQuote(id,d,decimals=2,suffix=""){
+  const el=document.querySelector("#"+id);
+  const dir=d.direction||((d.dayDiffPercent>0)?"UP":(d.dayDiffPercent<0?"DOWN":"FLAT"));
+  const arrow=dir==="UP"?"▲":dir==="DOWN"?"▼":"→";
+  const cls=dir==="UP"?"up":dir==="DOWN"?"down":"flat";
+  const price=Number.isFinite(+d.mid)?+d.mid:Number.isFinite(+d.last)?+d.last:NaN;
+  el.innerHTML=`<span class="quote"><span>${Number.isFinite(price)?price.toLocaleString("de-DE",{minimumFractionDigits:decimals,maximumFractionDigits:decimals}):"—"}${suffix}</span><span class="arrow ${cls}">${arrow}</span></span>`;
+  const c=document.querySelector("#"+id+"c");
+  if(c){
+    if(Number.isFinite(+d.dayDiffPercent)){
+      c.textContent=(d.dayDiffPercent>=0?"+":"")+Number(d.dayDiffPercent).toLocaleString("de-DE",{maximumFractionDigits:2})+"%";
+      c.className="small "+(d.dayDiffPercent>0?"green":d.dayDiffPercent<0?"red":"");
+    }else{
+      c.textContent=d.marketState==="closed"?"Markt geschlossen · letzter Kurs":"";
+    }
+  }
 }
-async function stocks(){await Promise.all([stock("dax","DAX"),stock("bist","BIST 100"),stock("dow","Dow Jones"),stock("sp","S&P 500"),stock("nasdaq","Nasdaq")])}
+async function fx(){
+  try{showQuote("fx",await quote("EURTRY"),2," ₺")}
+  catch{document.querySelector("#fx").textContent="—"}
+}
+async function metals(){
+  try{
+    const d=await j("https://biquote.io/api/latest?symbols=XAUUSD&symbols=XAGUSD");
+    showQuote("gold",d.XAUUSD,2," $");
+    showQuote("silver",d.XAGUSD,2," $");
+  }catch{}
+}
+async function stock(id,symbol,decimals=2){
+  try{showQuote(id,await quote(symbol),decimals)}
+  catch{
+    const e=document.querySelector("#"+id+"c"); if(e)e.textContent="Daten momentan nicht verfügbar";
+  }
+}
+async function stocks(){
+  await Promise.all([
+    stock("dax","DE30",2),
+    stock("bist","XU100",2),
+    stock("dow","US30",2),
+    stock("sp","US500",2),
+    stock("nasdaq","USTEC",2)
+  ]);
+}
 
 async function football(){
  try{
