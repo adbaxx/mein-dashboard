@@ -51,7 +51,8 @@ async function quote(symbol){
 }
 function showQuote(id,d,decimals=2,suffix=""){
   const el=document.querySelector("#"+id);
-  const dir=d.direction||((d.dayDiffPercent>0)?"UP":(d.dayDiffPercent<0?"DOWN":"FLAT"));
+  const pct=Number(d.dayDiffPercent);
+  const dir=Number.isFinite(pct)?(pct>0?"UP":(pct<0?"DOWN":"FLAT")):"FLAT";
   const arrow=dir==="UP"?"▲":dir==="DOWN"?"▼":"→";
   const cls=dir==="UP"?"up":dir==="DOWN"?"down":"flat";
   const price=Number.isFinite(+d.mid)?+d.mid:Number.isFinite(+d.last)?+d.last:NaN;
@@ -83,33 +84,62 @@ async function stock(id,symbol,decimals=2){
     const e=document.querySelector("#"+id+"c"); if(e)e.textContent="Daten momentan nicht verfügbar";
   }
 }
+async function bist(){
+ try{
+  const d=await j("data/bist.json?ts="+Date.now());
+  const pct=Number(d.changePercent);
+  const el=document.querySelector("#bist");
+  const dir=Number.isFinite(pct)?(pct>0?"UP":pct<0?"DOWN":"FLAT"):"FLAT";
+  const arrow=dir==="UP"?"▲":dir==="DOWN"?"▼":"→";
+  const cls=dir==="UP"?"up":dir==="DOWN"?"down":"flat";
+  el.innerHTML=`<span class="quote"><span>${Number(d.value).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})}</span><span class="arrow ${cls}">${arrow}</span></span>`;
+  const c=document.querySelector("#bistc");
+  c.textContent=Number.isFinite(pct)?(pct>=0?"+":"")+pct.toLocaleString("de-DE",{maximumFractionDigits:2})+"%":"Daten momentan nicht verfügbar";
+  c.className="small "+(pct>0?"green":pct<0?"red":"");
+ }catch{
+  document.querySelector("#bist").textContent="—";
+  document.querySelector("#bistc").textContent="Daten momentan nicht verfügbar";
+ }
+}
 async function stocks(){
-  await Promise.all([
-    stock("dax","DE30",2),
-    stock("bist","XU100",2),
-    stock("dow","US30",2),
-    stock("sp","US500",2),
-    stock("nasdaq","USTEC",2)
-  ]);
+ await Promise.all([
+  stock("dax","DE30",2),
+  bist(),
+  stock("dow","US30",2),
+  stock("sp","US500",2),
+  stock("nasdaq","USTEC",2)
+ ]);
 }
 
 function turkeyTime(ts){
-  if(!ts) return "";
-  const d=new Date(ts);
-  if(Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("de-DE",{timeZone:"Europe/Istanbul",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(d);
+ if(!ts) return "";
+ return new Intl.DateTimeFormat("de-DE",{timeZone:"Europe/Istanbul",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(ts));
 }
 async function football(){
- try{
-  const ids=[["🇩🇪 Deutschland",133907],["🇹🇷 Türkei",135985]], out=[];
-  for(const [label,id] of ids){
-   const d=await j(`https://www.thesportsdb.com/api/v1/json/123/eventsnext.php?id=${id}`);
-   const ev=(d.events||[]).filter(x=>new Date(x.strTimestamp||x.dateEvent)>=new Date()).slice(0,5);
-   out.push(`<div class="match"><b>${label}</b><div class="small">Alle Uhrzeiten: 🇹🇷 Türkei-Zeit</div></div>`);
-   out.push(...ev.map(x=>`<div class="match"><div class="row"><b>${x.strHomeTeam}</b><span>⚽</span><b>${x.strAwayTeam}</b></div><div class="small center">${turkeyTime(x.strTimestamp)} Uhr · Türkei-Zeit</div></div>`));
-  }
-  document.querySelector("#football").innerHTML=out.join("")||"<div class='small'>Keine kommenden Spiele gefunden.</div>";
- }catch{document.querySelector("#football").innerHTML="<div class='small'>Fußball-Daten momentan nicht verfügbar.</div>"}
+ const fixtures=[
+  ["2026-09-24T18:45:00Z","Niederlande","Deutschland"],
+  ["2026-09-25T18:45:00Z","Türkiye","Frankreich"],
+  ["2026-09-27T18:45:00Z","Deutschland","Griechenland"],
+  ["2026-09-28T18:45:00Z","Türkiye","Italien"],
+  ["2026-10-01T18:45:00Z","Deutschland","Serbien"],
+  ["2026-10-02T18:45:00Z","Belgien","Türkiye"],
+  ["2026-10-04T18:45:00Z","Griechenland","Deutschland"],
+  ["2026-10-05T18:45:00Z","Italien","Türkiye"],
+  ["2026-11-12T17:00:00Z","Türkiye","Belgien"],
+  ["2026-11-13T19:45:00Z","Serbien","Deutschland"],
+  ["2026-11-15T19:45:00Z","Frankreich","Türkiye"],
+  ["2026-11-16T19:45:00Z","Deutschland","Niederlande"]
+ ];
+ const now=Date.now();
+ const teams=[["🇩🇪 Deutschland","Deutschland"],["🇹🇷 Türkei","Türkiye"]];
+ let out=[];
+ for(const [label,name] of teams){
+  const ev=fixtures.filter(x=>new Date(x[0]).getTime()>=now&&(x[1]===name||x[2]===name)).slice(0,1);
+  out.push(`<div class="match"><b>${label}</b><div class="small">Alle Uhrzeiten: 🇹🇷 Türkei-Zeit</div></div>`);
+  if(ev.length){const x=ev[0];out.push(`<div class="match"><div class="row"><b>${x[1]}</b><span>⚽</span><b>${x[2]}</b></div><div class="small center">${turkeyTime(x[0])} Uhr · 🇹🇷 Türkei-Zeit</div></div>`);}
+  else out.push(`<div class="small">Keine kommenden Spiele gefunden.</div>`);
+ }
+ document.querySelector("#football").innerHTML=out.join("");
 }
 
 async function load(){document.querySelector("#status").textContent="Aktualisiere …";await Promise.allSettled([weather(),water(),fx(),metals(),stocks(),football()]);document.querySelector("#status").textContent="Zuletzt aktualisiert: "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
