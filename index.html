@@ -93,15 +93,20 @@ async function stocks(){
   ]);
 }
 
+function turkeyTime(ts){
+  if(!ts) return "";
+  const d=new Date(ts);
+  if(Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("de-DE",{timeZone:"Europe/Istanbul",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(d);
+}
 async function football(){
  try{
-  const ids=[["🇩🇪 Deutschland",133907],["🇹🇷 Türkei",135985]];
-  const out=[];
+  const ids=[["🇩🇪 Deutschland",133907],["🇹🇷 Türkei",135985]], out=[];
   for(const [label,id] of ids){
    const d=await j(`https://www.thesportsdb.com/api/v1/json/123/eventsnext.php?id=${id}`);
    const ev=(d.events||[]).filter(x=>new Date(x.strTimestamp||x.dateEvent)>=new Date()).slice(0,5);
-   out.push(`<div class="match"><b>${label}</b></div>`);
-   out.push(...ev.map(x=>`<div class="match"><div class="row"><b>${x.strHomeTeam}</b><span>⚽</span><b>${x.strAwayTeam}</b></div><div class="small center">${x.dateEvent||""} · ${x.strTime||""}</div></div>`));
+   out.push(`<div class="match"><b>${label}</b><div class="small">Alle Uhrzeiten: 🇹🇷 Türkei-Zeit</div></div>`);
+   out.push(...ev.map(x=>`<div class="match"><div class="row"><b>${x.strHomeTeam}</b><span>⚽</span><b>${x.strAwayTeam}</b></div><div class="small center">${turkeyTime(x.strTimestamp)} Uhr · Türkei-Zeit</div></div>`));
   }
   document.querySelector("#football").innerHTML=out.join("")||"<div class='small'>Keine kommenden Spiele gefunden.</div>";
  }catch{document.querySelector("#football").innerHTML="<div class='small'>Fußball-Daten momentan nicht verfügbar.</div>"}
